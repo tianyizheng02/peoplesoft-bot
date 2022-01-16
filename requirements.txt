@@ -1,0 +1,39 @@
+aiohttp==3.7.4.post0
+appdirs==1.4.4
+async-timeout==3.0.1
+attrs==21.4.0
+beautifulsoup4==4.10.0
+bs4==0.0.1
+certifi==2021.10.8
+chardet==4.0.0
+charset-normalizer==2.0.10
+cssselect==1.1.0
+discord==1.7.3
+discord-ext-menus @ git+https://github.com/Rapptz/discord-ext-menus@fbb8803779373357e274e1540b368365fd9d8074
+discord-ext-menus-views @ git+https://github.com/oliver-ni/discord-ext-menus-views@ebe27e606fbacedfd472a65275bcaa197bf30666
+discord.py @ git+https://github.com/Rapptz/discord.py@45d498c1b76deaf3b394d17ccf56112fa691d160
+fake-useragent==0.1.11
+idna==3.3
+importlib-metadata==4.10.0
+lxml==4.7.1
+meteo-downloader==1.0
+multidict==5.2.0
+parse==1.19.0
+pip==21.3.1
+pyee==8.2.2
+pyppeteer==1.0.2
+pyquery==1.4.3
+python-dotenv==0.19.2
+requests==2.27.1
+requests-html==0.10.0
+setuptools==60.2.0
+six==1.16.0
+soupsieve==2.3.1
+tqdm==4.62.3
+typing_extensions==4.0.1
+urllib3==1.26.8
+w3lib==1.22.0
+websockets==10.1
+wheel==0.37.1
+yarl==1.7.2
+zipp==3.7.0
