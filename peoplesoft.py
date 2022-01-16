@@ -24,9 +24,9 @@ from logging import getLogger, INFO
 from re import search
 from typing import NamedTuple
 
-from parse import compile
 from requests import get
 from requests_html import HTMLSession, HTMLResponse
+from parse import compile as comp
 
 # Suppress debug-level logging messages from parse
 getLogger("parse").setLevel(INFO)
@@ -88,14 +88,14 @@ LABEL_MAP = {
     'Wait List Capacity': 'waitlist_capacity'
 }
 
-COMBINED_SCT_PATTERN = compile(
+COMBINED_SCT_PATTERN = comp(
     '{course_name}\n'
     '{subject_code} {course_num} - {section_num} ({class_num})\n'
     'Status: {status}\n'
     'Seats Taken: {seats_taken:d}\n'
     'Wait List Total: {waitlist_size:d}')
-CREDIT_UNITS_PATTERN = compile('{:d} units')
-SCT_PATTERN = compile(
+CREDIT_UNITS_PATTERN = comp('{:d} units')
+SCT_PATTERN = comp(
     'Section: {section_num}-{section_type} ({class_num})\n'
     'Session: {session}\n'
     'Days/Times: {days_times}\n'
@@ -104,8 +104,8 @@ SCT_PATTERN = compile(
     'Meeting Dates: {dates}\n'
     'Status: {status}\n')
 
-SCT_TITLE_PATTERN = compile('{subject_code} {course_num} - {section_num}')
-SCT_WAITLIST_PATTERN = compile(
+SCT_TITLE_PATTERN = comp('{subject_code} {course_num} - {section_num}')
+SCT_WAITLIST_PATTERN = comp(
     'Section: {section_num}-{section_type} ({class_num})\n'
     'Session: {session}\n'
     'Days/Times: {days_times}\n'
@@ -114,7 +114,7 @@ SCT_WAITLIST_PATTERN = compile(
     'Meeting Dates: {dates}\n'
     'Status: {status}\n'
     'Wait List Total: {waitlist_size}')
-COURSE_INFO_PATTERN = compile('{subject_code} {course_num} - {course_title}')
+COURSE_INFO_PATTERN = comp('{subject_code} {course_num} - {course_title}')
 
 SCT_DETAIL_INT_FIELD = {
     'seats_taken',
