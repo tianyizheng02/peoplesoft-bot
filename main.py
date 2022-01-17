@@ -1,4 +1,3 @@
-from logging import getLogger, INFO
 from math import ceil
 from os import getenv
 
@@ -8,10 +7,6 @@ from discord.ext.menus.views import ViewMenuPages
 from dotenv import load_dotenv
 
 import peoplesoft as ps
-
-# Suppress debug-level logging messages from discord.py
-getLogger("discord").setLevel(INFO)
-getLogger("urllib3").setLevel(INFO)
 
 load_dotenv()
 DISCORD_TOKEN = getenv("DISCORD_TOKEN")

@@ -20,16 +20,12 @@ with this program; if not, write to the Free Software Foundation, Inc.,
 """
 from collections.abc import Generator
 from json import loads
-from logging import getLogger, INFO
-from re import search
+import re
 from typing import NamedTuple
 
+import parse
 from requests import get
-from requests_html import HTMLSession, HTMLResponse
-from parse import compile as comp
-
-# Suppress debug-level logging messages from parse
-getLogger("parse").setLevel(INFO)
+from requests_html import HTMLSession
 
 PSMOBILE_URL = 'https://psmobile.pitt.edu/app/catalog/'
 CLASS_SEARCH_URL = PSMOBILE_URL + 'classSearch'
@@ -88,14 +84,14 @@ LABEL_MAP = {
     'Wait List Capacity': 'waitlist_capacity'
 }
 
-COMBINED_SCT_PATTERN = comp(
+COMBINED_SCT_PATTERN = parse.compile(
     '{course_name}\n'
     '{subject_code} {course_num} - {section_num} ({class_num})\n'
     'Status: {status}\n'
     'Seats Taken: {seats_taken:d}\n'
     'Wait List Total: {waitlist_size:d}')
-CREDIT_UNITS_PATTERN = comp('{:d} units')
-SCT_PATTERN = comp(
+CREDIT_UNITS_PATTERN = parse.compile('{:d} units')
+SCT_PATTERN = parse.compile(
     'Section: {section_num}-{section_type} ({class_num})\n'
     'Session: {session}\n'
     'Days/Times: {days_times}\n'
@@ -104,8 +100,8 @@ SCT_PATTERN = comp(
     'Meeting Dates: {dates}\n'
     'Status: {status}\n')
 
-SCT_TITLE_PATTERN = comp('{subject_code} {course_num} - {section_num}')
-SCT_WAITLIST_PATTERN = comp(
+SCT_TITLE_PATTERN = parse.compile('{subject_code} {course_num} - {section_num}')
+SCT_WAITLIST_PATTERN = parse.compile(
     'Section: {section_num}-{section_type} ({class_num})\n'
     'Session: {session}\n'
     'Days/Times: {days_times}\n'
@@ -114,7 +110,8 @@ SCT_WAITLIST_PATTERN = comp(
     'Meeting Dates: {dates}\n'
     'Status: {status}\n'
     'Wait List Total: {waitlist_size}')
-COURSE_INFO_PATTERN = comp('{subject_code} {course_num} - {course_title}')
+COURSE_INFO_PATTERN = parse.compile('{subject_code} {course_num} - '
+                                    '{course_title}')
 
 SCT_DETAIL_INT_FIELD = {
     'seats_taken',
@@ -213,7 +210,7 @@ class Subject(NamedTuple):
 def _get_subject_json(campus: str) -> Generator[dict, None, None]:
     """Parse PSMobile JSON into an iterator of subject codes."""
     text = get(CLASS_SEARCH_URL).text
-    s = search(r'(?=subjects\s*:\s).*,', text)
+    s = re.search(r'(?=subjects\s*:\s).*,', text)
     text = s.group()[:-1]
     text = text[text.find(':') + 1:]
     data = loads(text)
@@ -224,7 +221,7 @@ def _get_subject_json(campus: str) -> Generator[dict, None, None]:
             yield code
 
 
-def _parse_class_search(resp: HTMLResponse, term: str) -> dict[str, Course]:
+def _parse_class_search(resp, term: str) -> dict[str, Course]:
     """Parse the HTMLResponse resulting from a PSMobile query with a given
     payload."""
     if resp.html.search('No classes found matching your criteria'):
@@ -424,7 +421,7 @@ def get_section(class_num: str, term: str = CURR_TERM) -> SectionDetails:
             if 'seat_restrictions' not in data:
                 data['seat_restrictions'] = {}
             data['seat_restrictions'][label] = int(
-                search(r'\d+', content).group())
+                re.search(r'\d+', content).group())
             continue
 
         if label in LABEL_MAP:
