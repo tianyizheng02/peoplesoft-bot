@@ -130,6 +130,8 @@ async def course(ctx, *args):
             params = dict(subject=subject, course=course_num)
             # Set term and campus if specified
             match others:
+                case []:  # ?course [subject] [course num]
+                    pass
                 # ?course [subject] [course num] [term]
                 case [term] if term in ps.TERMS:
                     params["term"] = ps.TERMS[term]
@@ -137,7 +139,12 @@ async def course(ctx, *args):
                 case [campus] if campus in ps.CAMPUSES:
                     params["campus"] = ps.CAMPUSES[campus]
                 # ?course [subject] [course num] [term] [campus]
-                case [term, campus] | [campus, term] \
+                case [term, campus] \
+                        if term in ps.TERMS and campus in ps.CAMPUSES:
+                    params["term"] = ps.TERMS[term]
+                    params["campus"] = ps.CAMPUSES[campus]
+                # ?course [subject] [course num] [term] [campus]
+                case [campus, term] \
                         if term in ps.TERMS and campus in ps.CAMPUSES:
                     params["term"] = ps.TERMS[term]
                     params["campus"] = ps.CAMPUSES[campus]
@@ -148,8 +155,7 @@ async def course(ctx, *args):
                 case [campus, _] | [_, campus] if campus in ps.CAMPUSES:
                     await handle_error(ctx, ValueError("Invalid term"))
                 case _:
-                    await handle_error(
-                        ctx, ValueError("Incorrect command format"))
+                    raise ValueError("Incorrect command format")
             try:
                 info = ps.get_course(**params)
                 pages = ViewMenuPages(source=EmbedPages(format_course(info)))
@@ -233,12 +239,12 @@ async def section(ctx, *args):
             params = {"class_num": class_num}
             # Set term if specified (current term is default)
             match others:
-                case []:    # ?section [class num]
+                case []:  # ?section [class num]
                     pass
                 # ?section [class num] [term]
                 case [term] if term in ps.TERMS:
                     params["term"] = ps.TERMS[term]
-                case [_]:   # ?section [class num] [not a term]
+                case [_]:  # ?section [class num] [not a term]
                     await handle_error(ctx, ValueError("Invalid term"))
                 case _:
                     await handle_error(
