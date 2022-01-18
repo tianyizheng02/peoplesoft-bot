@@ -297,7 +297,7 @@ def _validate_course(course: str) -> str:
     return course
 
 
-def _validate_section(section: str):
+def _validate_section(section: str) -> None:
     """Check if section number is a 5-digit number."""
     if not section.isdigit() or len(section) != 5:
         raise ValueError("Invalid section number")
@@ -377,6 +377,7 @@ def get_course(subject: str, course: str, term: str = CURR_TERM,
 def get_section(class_num: str, term: str = CURR_TERM) -> SectionDetails:
     """Get details on a specific section of a course given a class number. The
     term is the current term by default."""
+    _validate_section(class_num)
     data = dict(term=term, class_num=class_num)
     session = HTMLSession()
     url = SCT_DETAIL_URL.format(term=term, class_num=class_num)
