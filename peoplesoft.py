@@ -37,7 +37,7 @@ TERMS = {
     "spring": "2224",
     "summer": "2227"
 }
-CURR_TERM = TERMS["spring"]
+CURR_TERM = "spring"
 CAMPUSES = {
     "main": "PIT",
     "bradford": "UPB",
@@ -45,7 +45,7 @@ CAMPUSES = {
     "johnstown": "UPJ",
     "titusville": "UPT"
 }
-MAIN_CAMPUS = CAMPUSES["main"]
+MAIN_CAMPUS = "main"
 CAREERS = {
     "undergrad": "UGRD",
     "dental": "DMED",
@@ -303,9 +303,10 @@ def _validate_section(section: str) -> None:
         raise ValueError("Invalid section number")
 
 
-def _get_payload(term: str = CURR_TERM, campus: str = MAIN_CAMPUS,
-                 career: str = "", subject: str = "", course: str = "",
-                 section: str = "") -> tuple[HTMLSession, dict[str, str]]:
+def _get_payload(term: str = TERMS[CURR_TERM],
+                 campus: str = CAMPUSES[MAIN_CAMPUS], career: str = "",
+                 subject: str = "", course: str = "", section: str = "") \
+        -> tuple[HTMLSession, dict[str, str]]:
     """Make payload for request and generate CSRFToken for the request."""
 
     session = HTMLSession()  # Generate new CSRFToken
@@ -322,13 +323,13 @@ def _get_payload(term: str = CURR_TERM, campus: str = MAIN_CAMPUS,
     return session, payload
 
 
-def get_subject_codes(campus: str = MAIN_CAMPUS) -> list[str]:
+def get_subject_codes(campus: str = CAMPUSES[MAIN_CAMPUS]) -> list[str]:
     """Get list of available subject codes for a Pitt campus. The campus is
     main campus by default."""
     return [code["subject"] for code in _get_subject_json(campus)]
 
 
-def get_detailed_subject_codes(campus: str = MAIN_CAMPUS) -> list[SubjectCode]:
+def get_subject_names(campus: str = CAMPUSES[MAIN_CAMPUS]) -> list[SubjectCode]:
     """Get list of available subjects codes for a Pitt campus as well as the
     subjects' full names. The campus is main campus by default."""
     return [SubjectCode(
@@ -337,8 +338,9 @@ def get_detailed_subject_codes(campus: str = MAIN_CAMPUS) -> list[SubjectCode]:
         for code in _get_subject_json(campus)]
 
 
-def get_subject(subject: str, term: str = CURR_TERM,
-                campus: str = MAIN_CAMPUS, career: str = "") -> Subject:
+def get_subject(subject: str, term: str = TERMS[CURR_TERM],
+                campus: str = CAMPUSES[MAIN_CAMPUS], career: str = "") \
+        -> Subject:
     """Get a list of courses available for a subject. The term is the current
     term, the campus is main campus, and the career is unspecified by
     default."""
@@ -355,8 +357,8 @@ def get_subject(subject: str, term: str = CURR_TERM,
     return subject
 
 
-def get_course(subject: str, course: str, term: str = CURR_TERM,
-               campus: str = MAIN_CAMPUS) -> Course | None:
+def get_course(subject: str, course: str, term: str = TERMS[CURR_TERM],
+               campus: str = CAMPUSES[MAIN_CAMPUS]) -> Course | None:
     """Get details on all sections of a course given the subject and course
     number. The term is the current term and the campus is main campus by
     default."""
@@ -374,7 +376,7 @@ def get_course(subject: str, course: str, term: str = CURR_TERM,
     return course
 
 
-def get_section(class_num: str, term: str = CURR_TERM) -> SectionDetails:
+def get_section(class_num: str, term: str = TERMS[CURR_TERM]) -> SectionDetails:
     """Get details on a specific section of a course given a class number. The
     term is the current term by default."""
     _validate_section(class_num)
@@ -445,4 +447,4 @@ def get_section(class_num: str, term: str = CURR_TERM) -> SectionDetails:
 
 
 if __name__ == "__main__":
-    print(get_detailed_subject_codes())
+    print(get_subject_names())

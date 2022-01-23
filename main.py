@@ -18,6 +18,13 @@ ZERO_WIDTH_SPACE = "\u200b"
 PITT_ROYAL = 0x003594
 PITT_GOLD = 0xFFB81C
 
+ARTICLES = {"the", "a", "an"}
+CONJ = {"for", "and", "nor", "but", "or", "yet", "so"}
+PREP = {"of", "to", "for", "in"}
+ALL_CAPS = {"cs", "ms"}
+NO_CAPS = ARTICLES.union(CONJ).union(PREP)
+SPECIAL_CAPS = {"phd": "PhD"}
+
 
 class EmbedPages(menus.ListPageSource):
     """Multi-page embed class for displaying info on one embed at a time."""
@@ -29,24 +36,38 @@ class EmbedPages(menus.ListPageSource):
         return entry
 
 
-class SubjectPages(menus.ListPageSource):
+class ColumnPages(menus.ListPageSource):
     """Multi-page embed class for displaying lists of subjects in columns."""
 
-    def __init__(self, data, campus):
+    def __init__(self, data, title):
         super().__init__(data, per_page=12)
         self.pages = ceil(len(self.entries) / self.per_page)
-        self.campus = campus
+        self.title = title
 
-    async def format_page(self, menu, entries: list[ps.SubjectCode]) -> Embed:
-        page = Embed(title=f"SUBJECTS OFFERED AT {self.campus.upper()} CAMPUS",
+    async def format_page(self, menu, entries: list[tuple[str, str]]) -> Embed:
+        page = Embed(title=self.title,
                      color=PITT_GOLD if menu.current_page % 2 else PITT_ROYAL)
-        for subject in entries:
-            page.add_field(name=subject.subject_code, value=subject.desc)
+        for heading, desc in entries:
+            page.add_field(name=heading, value=desc)
         for _ in range((3 - (len(entries) % 3)) % 3):
             # Empty fields serve as placeholders for alignment
             page.add_field(name=ZERO_WIDTH_SPACE, value=ZERO_WIDTH_SPACE)
         page.set_footer(text=f"Page {menu.current_page + 1} of {self.pages}")
         return page
+
+
+def titlecase(string: str) -> str:
+    words = []
+    for i, word in enumerate(string.lower().split()):
+        if word in ALL_CAPS:
+            words.append(word.upper())
+        elif word in SPECIAL_CAPS:
+            words.append(SPECIAL_CAPS[word])
+        elif i != 0 and word in NO_CAPS:
+            words.append(word)
+        else:
+            words.append(word.title())
+    return ' '.join(words)
 
 
 @bot.event
@@ -56,50 +77,113 @@ async def on_ready():
     print(f"PeopleSoft Bot is now running on {len(bot.guilds)} "
           f"server{'s' if len(bot.guilds) > 1 else ''}:")
     for guild in bot.guilds:
-        print(f"{guild.name}\t{guild.id}")
+        print(f"\t{guild.name}\t{guild.id}")
 
 
 @bot.command(description="pong")
 async def ping(ctx):
     """Ping-pong command to test connection (creator only)."""
-    if ctx.author.id == MY_ID:
+    if ctx.author.id == int(MY_ID):
         await ctx.send("pong")
 
 
 @bot.command(description="Gets list of subjects for a specific campus")
 async def subjects(ctx, *args):
-    """Get and displays a multi-page embed of the list of subjects for one of
-    Pitt's campuses. Campus is assumed to be main campus unless specified
+    """Get and displays a multi-page embed of the list of subjects for a
+    specific campus. Campus is assumed to be main campus unless specified
     otherwise."""
     params = {}
-    campus = "main"
+    campus = ps.MAIN_CAMPUS
     match [arg.lower() for arg in args]:
         case [arg]:
             if arg in ps.CAMPUSES:  # ?subjects [campus]
+                campus = arg.capitalize()
                 params["campus"] = ps.CAMPUSES[arg]
-                campus = arg
             else:
                 await handle_error(ctx, ValueError("Invalid campus"))
+                return
         case []:  # ?subjects
             pass
         case _:
-            await handle_error(ctx, Exception("Incorrect command format"))
+            await handle_error(ctx, Exception("Incorrect format"))
+            return
     try:
-        info = ps.get_detailed_subject_codes(**params)
-        pages = ViewMenuPages(source=SubjectPages(data=info, campus=campus))
-        await pages.start(ctx)
+        info = ps.get_subject_names(**params)
+        page_data = ColumnPages(
+            data=[(subj.subject_code, subj.desc) for subj in info],
+            title=f"Subjects Available at {campus.capitalize()} Campus"
+        )
+        await ViewMenuPages(source=page_data).start(ctx)
+    except Exception as e:
+        await handle_error(ctx, e)
+
+
+@bot.command(description="Gets a list of courses for a specific subject")
+async def courses(ctx, *args):
+    """Get and displays a multi-page embed of the list of courses for a subject.
+    Term is assumed to be the current term, campus is assumed to be main campus,
+    and career is assumed to be undergrad unless specified otherwise."""
+    params = {}
+    campus = ps.MAIN_CAMPUS
+    match [arg.lower() for arg in args]:
+        case [subject, *others]:  # ?courses [subject] ...
+            params["subject"] = subject
+            match others:
+                case [arg] if arg in ps.TERMS:  # ?courses [subject] [term]
+                    params["term"] = ps.TERMS[arg]
+                # ?courses [subject] [campus]
+                case [arg] if arg in ps.CAMPUSES:
+                    campus = arg
+                    params["campus"] = ps.CAMPUSES[arg]
+                case [_]:  # ?courses [subject] [not a term or campus]
+                    await handle_error(ctx, ValueError("Invalid term/campus"))
+                    return
+                # ?courses [subject] [term] [campus]
+                case [arg1, arg2] if arg1 in ps.TERMS and arg2 in ps.CAMPUSES:
+                    params["term"] = ps.TERMS[arg1]
+                    params["campus"] = ps.CAMPUSES[arg2]
+                # ?courses [subject] [term] [campus]
+                case [arg1, arg2] if arg2 in ps.TERMS and arg1 in ps.CAMPUSES:
+                    params["term"] = ps.TERMS[arg2]
+                    params["campus"] = ps.CAMPUSES[arg1]
+                # ?courses [subject] [term] [not a campus]
+                case [arg, _] | [_, arg] if arg in ps.TERMS:
+                    await handle_error(ctx, ValueError("Invalid campus"))
+                    return
+                # ?courses [subject] [campus] [not a term]
+                case [arg, _] | [_, arg] if arg in ps.CAMPUSES:
+                    await handle_error(ctx, ValueError("Invalid term"))
+                    return
+                case []:  # ?courses [subject]
+                    pass
+                case _:
+                    await handle_error(ctx, ValueError("Incorrect format"))
+                    return
+        case _:
+            await handle_error(ctx, Exception("No subject provided"))
+            return
+    try:
+        info = ps.get_subject(**params)
+        pages = ColumnPages(
+            data=[(f"{params['subject'].upper()} {num}",
+                   titlecase(course.course_title))
+                  for num, course in info.courses.items()],
+            title=f"{params['subject'].upper()} Courses Available at "
+                  f"{campus.capitalize()} Campus"
+        )
+        await ViewMenuPages(source=pages).start(ctx)
     except Exception as e:
         await handle_error(ctx, e)
 
 
 @bot.command(description="Gets list of sections for a specific course")
-async def course(ctx, *args):
+async def sections(ctx, *args):
     def format_course(course_info: ps.Course) -> list[Embed]:
         embeds = []
         for i, sct in enumerate(course_info.sections, start=1):
             embed = Embed(title=f"{course_info.subject_code} "
                                 f"{course_info.course_num}: "
-                                f"{course_info.course_title}",
+                                f"{titlecase(course_info.course_title)}",
                           color=PITT_ROYAL if i % 2 else PITT_GOLD)
             embed.add_field(name="Type", value=sct.section_type)
             embed.add_field(name="Section #", value=sct.section_num)
@@ -125,41 +209,39 @@ async def course(ctx, *args):
         return embeds
 
     match [arg.lower() for arg in args]:
-        # ?course [subject] [course num] ...
+        # ?sections [subject] [course num] ...
         case [subject, course_num, *others]:
             params = dict(subject=subject, course=course_num)
             # Set term and campus if specified
             match others:
-                case []:  # ?course [subject] [course num]
-                    pass
-                # ?course [subject] [course num] [term]
-                case [term] if term in ps.TERMS:
-                    params["term"] = ps.TERMS[term]
-                # ?course [subject] [course num] [campus]
-                case [campus] if campus in ps.CAMPUSES:
-                    params["campus"] = ps.CAMPUSES[campus]
-                # ?course [subject] [course num] [term] [campus]
-                case [term, campus] \
-                        if term in ps.TERMS and campus in ps.CAMPUSES:
-                    params["term"] = ps.TERMS[term]
-                    params["campus"] = ps.CAMPUSES[campus]
-                # ?course [subject] [course num] [term] [campus]
-                case [campus, term] \
-                        if term in ps.TERMS and campus in ps.CAMPUSES:
-                    params["term"] = ps.TERMS[term]
-                    params["campus"] = ps.CAMPUSES[campus]
-                # ?course [subject] [course num] [term] [not a campus]
-                case [term, _] | [_, term] if term in ps.TERMS:
+                # ?sections [subject] [course num] [term]
+                case [arg] if arg in ps.TERMS:
+                    params["term"] = ps.TERMS[arg]
+                # ?sections [subject] [course num] [campus]
+                case [arg] if arg in ps.CAMPUSES:
+                    params["campus"] = ps.CAMPUSES[arg]
+                # ?sections [subject] [course num] [term] [campus]
+                case [arg1, arg2] if arg1 in ps.TERMS and arg2 in ps.CAMPUSES:
+                    params["term"] = ps.TERMS[arg1]
+                    params["campus"] = ps.CAMPUSES[arg2]
+                # ?sections [subject] [course num] [term] [campus]
+                case [arg1, arg2] if arg2 in ps.TERMS and arg1 in ps.CAMPUSES:
+                    params["term"] = ps.TERMS[arg2]
+                    params["campus"] = ps.CAMPUSES[arg1]
+                # ?sections [subject] [course num] [term] [not a campus]
+                case [arg, _] | [_, arg] if arg in ps.TERMS:
                     await handle_error(ctx, ValueError("Invalid campus"))
-                # ?course [subject] [course num] [campus] [not a term]
-                case [campus, _] | [_, campus] if campus in ps.CAMPUSES:
+                # ?sections [subject] [course num] [campus] [not a term]
+                case [arg, _] | [_, arg] if arg in ps.CAMPUSES:
                     await handle_error(ctx, ValueError("Invalid term"))
+                case []:  # ?sections [subject] [course num]
+                    pass
                 case _:
-                    raise ValueError("Incorrect command format")
+                    await handle_error(ctx, ValueError("Incorrect format"))
             try:
                 info = ps.get_course(**params)
-                pages = ViewMenuPages(source=EmbedPages(format_course(info)))
-                await pages.start(ctx)
+                pages = EmbedPages(format_course(info))
+                await ViewMenuPages(source=pages).start(ctx)
             except Exception as e:
                 await handle_error(ctx, e)
         case [_]:
@@ -173,9 +255,9 @@ async def section(ctx, *args):
     def format_section(info: ps.SectionDetails) -> list[Embed]:
         """Helper function for formatting embeds for section info."""
 
-        # First embed page is for enrollment info (section #, units, etc.)
         embed1 = Embed(title=f"{info.subject_code} {info.course_num}: "
-                             f"{info.course_title} ({info.class_num})",
+                             f"{titlecase(info.course_title)} "
+                             f"({info.class_num})",
                        description=info.desc, color=PITT_ROYAL)
         embed1.add_field(name="Section #", value=info.section_num)
         embed1.add_field(name="Session", value=info.session)
@@ -194,8 +276,6 @@ async def section(ctx, *args):
         if info.notes:
             embed1.add_field(name="Notes", value=info.notes)
 
-        # Second embed page is for scheduling info (instructor, days/times,
-        # location, etc.)
         embed2 = Embed(title=f"{info.subject_code} {info.course_num}: "
                              f"{info.course_title} ({info.class_num})",
                        description=info.desc, color=PITT_GOLD)
@@ -207,8 +287,6 @@ async def section(ctx, *args):
         embed2.add_field(name="Campus", value=info.campus)
         embed2.add_field(name="Status", value=info.status)
 
-        # Third embed page is for capacity info (open seats, restricted seats,
-        # waitlists, etc.)
         embed3 = Embed(title=f"{info.subject_code} {info.course_num}: "
                              f"{info.course_title} ({info.class_num})",
                        description=info.desc, color=PITT_ROYAL)
@@ -239,21 +317,20 @@ async def section(ctx, *args):
             params = {"class_num": class_num}
             # Set term if specified (current term is default)
             match others:
-                case []:  # ?section [class num]
-                    pass
-                # ?section [class num] [term]
-                case [term] if term in ps.TERMS:
-                    params["term"] = ps.TERMS[term]
+                case [arg] if arg in ps.TERMS:  # ?section [class num] [term]
+                    params["term"] = ps.TERMS[arg]
                 case [_]:  # ?section [class num] [not a term]
                     await handle_error(ctx, ValueError("Invalid term"))
+                    return
+                case []:  # ?section [class num]
+                    pass
                 case _:
-                    await handle_error(
-                        ctx, ValueError("Incorrect command format"))
+                    await handle_error(ctx, ValueError("Incorrect format"))
+                    return
             try:
                 sct_info = ps.get_section(**params)
-                pages = ViewMenuPages(
-                    source=EmbedPages(format_section(sct_info)))
-                await pages.start(ctx)
+                pages = EmbedPages(format_section(sct_info))
+                await ViewMenuPages(source=pages).start(ctx)
             except Exception as e:
                 await handle_error(ctx, e)
         case _:
@@ -261,7 +338,8 @@ async def section(ctx, *args):
 
 
 @subjects.error
-@course.error
+@courses.error
+@sections.error
 @section.error
 async def handle_error(ctx, e: Exception) -> None:
     await ctx.send(f"**{type(e).__name__}: {e}**")
