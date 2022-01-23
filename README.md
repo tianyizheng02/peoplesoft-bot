@@ -12,7 +12,9 @@ The bot currently supports the following commands:
 
 - `?subjects [campus]`: Gets a list of subjects with their abbreviated subject codes
 
-- `?course <subject_code> <course_number> [campus] [term]`: Gets a list of sections for a specific course
+- `?courses <subject_code> [campus] [term]`: Gets a list of courses for a specific subject
+
+- `?sections <subject_code> <course_number> [campus] [term]`: Gets a list of sections for a specific course
 
 - `?section <class_number> [term]`: Gets detailed info about a specific section
 
