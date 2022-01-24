@@ -18,12 +18,11 @@ You should have received a copy of the GNU General Public License along
 with this program; if not, write to the Free Software Foundation, Inc.,
 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 """
+from re import compile, search
 from collections.abc import Generator
 from json import loads
-import re
 from typing import NamedTuple
 
-import parse
 from requests import get
 from requests_html import HTMLSession
 
@@ -83,36 +82,6 @@ LABEL_MAP = {
     "Wait List Total": "waitlist_size",
     "Wait List Capacity": "waitlist_capacity"
 }
-
-COMBINED_SCT_PATTERN = parse.compile(
-    "{course_name}\n"
-    "{subject_code} {course_num} - {section_num} ({class_num})\n"
-    "Status: {status}\n"
-    "Seats Taken: {seats_taken:d}\n"
-    "Wait List Total: {waitlist_size:d}")
-CREDIT_UNITS_PATTERN = parse.compile("{:d} units")
-SCT_PATTERN = parse.compile(
-    "Section: {section_num}-{section_type} ({class_num})\n"
-    "Session: {session}\n"
-    "Days/Times: {days_times}\n"
-    "Room: {room}\n"
-    "Instructor: {instructor}\n"
-    "Meeting Dates: {dates}\n"
-    "Status: {status}\n")
-
-SCT_TITLE_PATTERN = parse.compile("{subject_code} {course_num} - {section_num}")
-SCT_WAITLIST_PATTERN = parse.compile(
-    "Section: {section_num}-{section_type} ({class_num})\n"
-    "Session: {session}\n"
-    "Days/Times: {days_times}\n"
-    "Room: {room}\n"
-    "Instructor: {instructor}\n"
-    "Meeting Dates: {dates}\n"
-    "Status: {status}\n"
-    "Wait List Total: {waitlist_size}")
-COURSE_INFO_PATTERN = parse.compile("{subject_code} {course_num} - "
-                                    "{course_title}")
-
 SCT_DETAIL_INT_FIELD = {
     "seats_taken",
     "seats_open",
@@ -122,6 +91,28 @@ SCT_DETAIL_INT_FIELD = {
     "waitlist_size",
     "waitlist_capacity"
 }
+
+SECTION_REGEX = compile(
+    r"Section: (?P<section_num>\d+)-(?P<section_type>[A-Z]+) "
+    r"\((?P<class_num>\d+)\)\n"
+    r"Session: (?P<session>.+)\n"
+    r"Days/Times: (?P<days_times>.+)\n"
+    r"Room: (?P<room>.+)\n"
+    r"Instructor: (?P<instructor>.+)\n"
+    r"Meeting Dates: (?P<dates>.+)\n"
+    r"Status: (?P<status>.+)"
+)
+WAITLIST_REGEX = compile(
+    SECTION_REGEX.pattern + r"Wait List Total: (?P<waitlist_size>\d+)"
+)
+COMBINED_REGEX = compile(
+    r"(?P<course_name>.+)\n"
+    r"(?P<subject_code>[A-Z]+) (?P<course_num>\d+) - (?P<section_num>\d+)"
+    r"\((?P<class_num>\d+)\)\n"
+    r"Status: (?P<status>.+)\n"
+    r"Seats Taken: (?P<seats_taken>\d+)\n"
+    r"Wait List Total: (?P<waitlist_size>\d+)"
+)
 
 
 class CombinedSection(NamedTuple):
@@ -170,6 +161,7 @@ class SectionDetails(NamedTuple):
     consent: str | None = None
     notes: str | None = None
     attrs: list[str] | None = None
+
     seat_restrictions: dict[str, int] | None = None
     combined_sections: list[CombinedSection] | None = None
 
@@ -209,8 +201,7 @@ class Subject(NamedTuple):
 
 def _get_subject_json(campus: str) -> Generator[dict, None, None]:
     """Parse PSMobile JSON into an iterator of subject codes."""
-    text = get(CLASS_SEARCH_URL).text
-    s = re.search(r"(?=subjects\s*:\s).*,", text)
+    s = search(r"(?=subjects\s*:\s).*,", get(CLASS_SEARCH_URL).text)
     text = s.group()[:-1]
     text = text[text.find(":") + 1:]
     data = loads(text)
@@ -233,40 +224,38 @@ def _parse_class_search(resp, term: str) -> dict[str, Course]:
         raise ConnectionError("PeopleSoft is unavailable")
 
     courses: dict[str, Course] = {}
-    elements = resp.html.find("div")
-
     course = None
-    for element in elements:
+    for element in resp.html.find("div"):
         if "section-body" not in element.attrs["class"]:
-            print(element.text, end="\n\n")
+            # print(element.text, end="\n\n")
             if "secondary-head" in element.attrs["class"]:
-                content = COURSE_INFO_PATTERN.parse(element.text)
-                course = Course(**content.named, sections=[])
+                content = search(
+                    r"(?P<subject_code>[A-Z]+) (?P<course_num>\d+) - "
+                    r"(?P<course_title>.+)",
+                    element.text
+                ).groupdict()
+                course = Course(**content, sections=[])
                 courses[content["course_num"]] = course
             elif "section-content" in element.attrs["class"]:
-                content = SCT_WAITLIST_PATTERN.parse(element.text)
-                if content is None:
-                    content = SCT_PATTERN.parse(element.text + "\n")
-                    section = Section(
-                        **content.named, term=term, waitlist_size=None)
+                if not (content := WAITLIST_REGEX.search(element.text)):
+                    content = SECTION_REGEX.search(element.text).groupdict()
+                    section = Section(**content, term=term, waitlist_size=None)
                 else:
-                    section = Section(**content.named, term=term)
+                    section = Section(**content.groupdict(), term=term)
                 course.sections.append(section)
     return courses
 
 
 def _validate_campus(campus: str) -> str:
     """Check if the campus is a valid campus."""
-    campus = campus.upper()
-    if campus not in CAMPUSES.values():
+    if (campus := campus.upper()) not in CAMPUSES.values():
         raise ValueError("Invalid campus")
     return campus
 
 
 def _validate_career(career: str) -> str:
     """Check whether the career is a valid career."""
-    career = career.upper()
-    if career not in CAREERS.values():
+    if (career := career.upper()) not in CAREERS.values():
         raise ValueError("Invalid career")
     return career
 
@@ -289,8 +278,8 @@ def _validate_course(course: str) -> str:
     digits long if possible."""
     if not course.isdigit():
         raise ValueError("Invalid course number")
-    course_length = len(course)
-    if course_length < 4:
+
+    if (course_length := len(course)) < 4:
         return ("0" * (4 - course_length)) + course
     elif course_length > 4:
         raise ValueError("Invalid course number")
@@ -332,10 +321,12 @@ def get_subject_codes(campus: str = CAMPUSES[MAIN_CAMPUS]) -> list[str]:
 def get_subject_names(campus: str = CAMPUSES[MAIN_CAMPUS]) -> list[SubjectCode]:
     """Get list of available subjects codes for a Pitt campus as well as the
     subjects' full names. The campus is main campus by default."""
-    return [SubjectCode(
-        subject_code=code["subject"], desc=code["descr"],
-        academic_group=code["acad_groups"]["group0"]["acad_group"])
-        for code in _get_subject_json(campus)]
+    return [
+        SubjectCode(
+            subject_code=code["subject"], desc=code["descr"],
+            academic_group=code["acad_groups"]["group0"]["acad_group"]
+        ) for code in _get_subject_json(campus)
+    ]
 
 
 def get_subject(subject: str, term: str = TERMS[CURR_TERM],
@@ -350,11 +341,11 @@ def get_subject(subject: str, term: str = TERMS[CURR_TERM],
     if career != "":
         career = _validate_career(career)
     session, payload = _get_payload(
-        term=term, campus=campus, career=career, subject=subject)
+        term=term, campus=campus, career=career, subject=subject
+    )
     response = session.post(url=CLASS_SEARCH_API_URL, data=payload)
     courses = _parse_class_search(resp=response, term=term)
-    subject = Subject(subject_code=subject, term=term, courses=courses)
-    return subject
+    return Subject(subject_code=subject, term=term, courses=courses)
 
 
 def get_course(subject: str, course: str, term: str = TERMS[CURR_TERM],
@@ -368,7 +359,8 @@ def get_course(subject: str, course: str, term: str = TERMS[CURR_TERM],
     campus = _validate_campus(campus)
     try:
         session, payload = _get_payload(
-            term=term, campus=campus, subject=subject, course=course)
+            term=term, campus=campus, subject=subject, course=course
+        )
         response = session.post(url=CLASS_SEARCH_API_URL, data=payload)
         course, *_ = _parse_class_search(response, term).values()
     except ValueError:
@@ -387,9 +379,12 @@ def get_section(class_num: str, term: str = TERMS[CURR_TERM]) -> SectionDetails:
 
     try:
         # The course title is in the HTML head rather than the body
-        title = SCT_TITLE_PATTERN.parse(
-            resp.html.xpath("/html/head/title")[0].text)
-        data.update(**title.named)
+        title = search(
+            r"(?P<subject_code>[A-Z]+) (?P<course_num>\d+) - "
+            r"(?P<section_num>\d+)",
+            resp.html.xpath("/html/head/title")[0].text
+        ).groupdict()
+        data.update(**title)
 
         elements = resp.html.xpath("/html/body/section/section/div")
         # Available room info is presented as a link rather than plaintext
@@ -402,18 +397,16 @@ def get_section(class_num: str, term: str = TERMS[CURR_TERM]) -> SectionDetails:
         for element in elements:
             print(element.text, end="\n\n")
             if "role" in element.attrs:
-                heading = element.text
-
                 # Heading is course title (which is always in all caps)
-                if heading.isupper():
+                if (heading := element.text).isupper():
                     data["course_title"] = heading
                 continue
 
             if heading == "Combined Section":
                 if "combined_sections" not in data:
                     data["combined_sections"] = []
-                content = COMBINED_SCT_PATTERN.parse(element.text)
-                combined_section = CombinedSection(**content.named, term=term)
+                content = COMBINED_REGEX.match(element.text).groupdict()
+                combined_section = CombinedSection(**content, term=term)
                 data["combined_sections"].append(combined_section)
                 continue
 
@@ -426,20 +419,22 @@ def get_section(class_num: str, term: str = TERMS[CURR_TERM]) -> SectionDetails:
                 if "seat_restrictions" not in data:
                     data["seat_restrictions"] = {}
                 data["seat_restrictions"][label] = int(
-                    re.search(r"\d+", content).group())
+                    search(r"\d+", content).group()
+                )
                 continue
 
             if label in LABEL_MAP:
-                label = LABEL_MAP[label]
-                if label == "components":
-                    content = content.split(", ")
-                elif label == "units":
-                    content = CREDIT_UNITS_PATTERN.parse(content)[0]
-                elif label == "attrs":
-                    content = [content] + extra
-                elif label in SCT_DETAIL_INT_FIELD:
-                    content = int(content)
-
+                match (label := LABEL_MAP[label]):
+                    case "components":
+                        content = content.split(", ")
+                    case "units":
+                        content = search(
+                            r"(?P<units>\d+|\d+ - \d+) units", content
+                        ).group("units")
+                    case "attrs":
+                        content = [content] + extra
+                    case label if label in SCT_DETAIL_INT_FIELD:
+                        content = int(content)
                 data[label] = content
     except AttributeError:
         raise ValueError("Section doesn't exist")
