@@ -36,7 +36,7 @@ TERMS = {
     "spring": "2224",
     "summer": "2227"
 }
-CURR_TERM = "spring"
+CURR_TERM = "fall"
 CAMPUSES = {
     "main": "PIT",
     "bradford": "UPB",
