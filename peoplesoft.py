@@ -32,7 +32,7 @@ CLASS_SEARCH_API_URL = PSMOBILE_URL + "getClassSearch"
 SCT_DETAIL_URL = PSMOBILE_URL + "classsection/UPITT/{term}/{class_num}"
 
 TERMS = {
-    "fall": "2221",
+    "fall": "2231",
     "spring": "2224",
     "summer": "2227"
 }
