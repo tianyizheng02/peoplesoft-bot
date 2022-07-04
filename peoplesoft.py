@@ -107,7 +107,7 @@ WAITLIST_REGEX = compile(
 )
 COMBINED_REGEX = compile(
     r"(?P<course_name>.+)\n"
-    r"(?P<subject_code>[A-Z]+) (?P<course_num>\d+) - (?P<section_num>\d+)"
+    r"(?P<subject_code>[A-Z]+) (?P<course_num>\d+) - (?P<section_num>\d+) "
     r"\((?P<class_num>\d+)\)\n"
     r"Status: (?P<status>.+)\n"
     r"Seats Taken: (?P<seats_taken>\d+)\n"
