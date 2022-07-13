@@ -265,10 +265,10 @@ async def course(ctx, *args):
             try:
                 info = ps.get_course(**params)
 
-                # Find first non-recitation section (not always first in list)
+                # Find first non-recitation/-lab section (not always first in list)
                 sct = info.sections[0]
                 for s in info.sections:
-                    if s.section_type != "REC":
+                    if s.section_type != "REC" and s.section_type != "LAB":
                         sct = s
                         break
 

@@ -156,6 +156,8 @@ class SectionDetails(NamedTuple):
     waitlist_size: int
     waitlist_capacity: int
 
+    career: str | None = None
+    grading: str | None = None
     desc: str = ""
     prereqs: str | None = None
     consent: str | None = None
