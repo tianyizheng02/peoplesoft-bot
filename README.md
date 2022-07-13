@@ -10,15 +10,15 @@ It works by scraping data from PSMobile, the mobile site for PeopleSoft that's a
 
 The bot currently supports the following commands:
 
-- `~subjects [campus]`: Gets list of subjects with their abbreviated subject codes
+- `??subjects [campus]`: Gets list of subjects with their abbreviated subject codes
 
-- `~courses <subject_code> [campus] [term]`: Gets list of courses for a specific subject
+- `??courses <subject_code> [campus] [term]`: Gets list of courses for a specific subject
 
-- `~course <subject_code> <course_number> [campus] [term]`: Gets info about a specific course
+- `??course <subject_code> <course_number> [campus] [term]`: Gets info about a specific course
 
-- `~sections <subject_code> <course_number> [campus] [term]`: Gets list of sections for a specific course
+- `??sections <subject_code> <course_number> [campus] [term]`: Gets list of sections for a specific course
 
-- `~section <class_number> [term]`: Gets info about a specific section of a course
+- `??section <class_number> [term]`: Gets info about a specific section of a course
 
 Where applicable, the default campus and term are main campus and the current term, respectively.
 

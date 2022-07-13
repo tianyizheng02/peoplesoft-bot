@@ -11,7 +11,7 @@ import peoplesoft as ps
 load_dotenv()
 DISCORD_TOKEN = getenv("DISCORD_TOKEN")
 MY_ID = getenv("MY_ID")
-PREFIX = "~"
+PREFIX = "??"
 bot = commands.Bot(command_prefix=PREFIX, case_insensitive=True)
 
 ZERO_WIDTH_SPACE = "\u200b"
