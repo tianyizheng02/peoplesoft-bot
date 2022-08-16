@@ -1,5 +1,7 @@
 # PeopleSoft Bot
 
+**UPDATE: This bot no longer works, as Pitt has since shut down PSMobile.**
+
 PeopleSoft Bot is a Discord bot that retrieves data from PeopleSoft, the student information system used by the University of Pittsburgh.
 I created it as a way for Pitt students on Discord to easily search for info on classes without needing to take the time to do it themselves.
 
